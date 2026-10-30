@@ -58,10 +58,33 @@ navigator.free();
 router.free();
 ```
 
-`alternatives` is the total requested count (1–3, default 1). Penalty searches
-return fewer routes if necessary: each must be at most 40% slower than the best
-and share at most 75% of the shorter network length with any earlier route.
-Sixteen bounded searches are attempted; this is not exhaustive enumeration.
+`alternatives` is the total requested count (1–3, default 1). Following the
+local-optimality, stretch and sharing criteria of [Abraham et al., *Alternative
+routes in road networks*](https://doi.org/10.1145/2444016.2444019), penalty-search
+candidates must pass all of these checks in `core`:
+
+- At most 40% slower than the best route, using original travel times.
+- At most 75% shared network length relative to the shorter path, against every
+  earlier accepted route.
+- Sampled local optimality: network windows costing up to T = 25% of the best
+  route's travel time must cost at most 1.10 times their own shortest-path cost.
+  Samples include all traversal boundaries and edge interiors at intervals no
+  greater than T/8. Every sampled endpoint pair within T is tested with bounded
+  Dijkstra, respecting mode and stair restrictions and using unpenalized costs.
+  Off-network endpoint connectors contribute to the best time but are not
+  themselves searchable network windows.
+- No repeated graph node, bearing reversal greater than 150° between arms
+  separated by up to 30 m of travel (including shapes and short cross-links), or
+  return within 15 m of an earlier point after more than 60 m of travel.
+  Proximity checks compare continuous geometry segments, including their
+  interiors, with a 0.1 mm conservative numerical allowance.
+
+The best route remains the unpenalized shortest path. Sixteen penalty searches
+are attempted; this is not exhaustive enumeration. If fewer candidates pass,
+fewer routes are returned. Local optimality is sampled, not a proof over every
+continuous subpath; the geometric checks also reject detours where missing
+graph links leave no shorter network path.
+
 Route metrics use declared lengths; `geometry_offsets_m` maps vertices to those
 lengths. Maneuvers include bearings, offsets, next-maneuver distance and Chinese
 instructions. Turn bands are 15°/45°/135°, sampled over up to 10 m within each
@@ -120,6 +143,14 @@ Set `WAYFIND_GRAPH_FILE` to a local graph for the optional integration test;
 unset or absent files skip it. It checks all target pairs in the main walking
 component and times 1,000 reproducible random routes, including geometry and
 maneuvers, with an 800 ms release ceiling. External data is never committed.
+The same configuration enables a 300-pair reproducible alternatives audit,
+requesting three routes per pair. Every returned alternative is checked for
+U-turns/returns and local optimality; an unrestricted A* independently verifies
+the sampled window costs. With `-- --nocapture`, the audit prints the number of
+returned alternatives, requests returning one/two/three routes, and unique
+rejected candidates per request by first failing rule (stretch, sharing,
+repeated node, reversal, near-return, local optimality). Repeated penalty
+attempts at the same candidate count once.
 For optional guidance regression checks, also set `WAYFIND_SAMPLE_ORIGIN` to a
 target id and `WAYFIND_SAMPLE_DESTINATIONS` to a JSON array of destination ids.
 The walking routes must have at most 10 maneuvers, spaced by at least 10 m

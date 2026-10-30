@@ -8,6 +8,9 @@ use crate::{
     RouteRequest, RouteResponse, RouteSegment, Snap,
 };
 
+mod quality;
+use quality::Rejection;
+
 #[derive(Clone, Debug)]
 pub(crate) struct Traversal {
     pub edge: usize,
@@ -240,6 +243,16 @@ impl Graph {
     }
 
     pub fn route(&self, request: &RouteRequest) -> Result<RouteResponse> {
+        self.route_observed(request, |_, _| {})
+    }
+
+    // Private observer lets regression tests audit candidates without exposing
+    // diagnostics or routing policy through the shared JSON protocol.
+    fn route_observed(
+        &self,
+        request: &RouteRequest,
+        mut observe: impl FnMut(&[Traversal], Option<Rejection>),
+    ) -> Result<RouteResponse> {
         if !(1..=3).contains(&request.alternatives)
             || !request.max_snap_distance_m.is_finite()
             || request.max_snap_distance_m < 0.0
@@ -267,12 +280,19 @@ impl Graph {
             }
             let candidate = self.search(&origin, &destination, request, &penalties)?;
             let route = self.materialize(&candidate, &origin, &destination, request);
-            let acceptable = route.duration_s <= best_duration * 1.4 + 1e-6
-                && paths
-                    .iter()
-                    .all(|earlier| self.overlap(&candidate, earlier) <= 0.75);
+            let rejection = if route.duration_s > best_duration * 1.4 + 1e-6 {
+                Some(Rejection::Stretch)
+            } else if paths
+                .iter()
+                .any(|earlier| self.overlap(&candidate, earlier) > 0.75)
+            {
+                Some(Rejection::Sharing)
+            } else {
+                self.alternative_quality(&candidate, &route, request, best_duration)
+            };
+            observe(&candidate, rejection);
             last = candidate.clone();
-            if acceptable {
+            if rejection.is_none() {
                 paths.push(candidate);
                 routes.push(route);
             }

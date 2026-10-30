@@ -15,6 +15,41 @@ beforeAll(async () => {
 });
 
 describe('real WASM typed API', () => {
+  it('rejects a parallel-road U-turn alternative and returns fewer routes', () => {
+    const router = new Router({ ...graph,
+      nodes: [[-200, 0], [-5, 0], [-5, -45], [5, -45], [5, 0], [200, 0]]
+        .map(([x, y]) => [x / 111195.0802335329, y / 111195.0802335329] as [number, number]),
+      edges: [[0, 5, 400, 3, -1], [0, 1, 195, 3, -1], [1, 2, 45, 3, -1],
+        [2, 3, 10, 3, -1], [3, 4, 45, 3, -1], [4, 5, 195, 3, -1]],
+      shapes: [[], [], [], [], [], []], targets: { start: [0], end: [5] },
+    });
+    try {
+      const { routes } = router.route({ ...request, alternatives: 3 });
+      expect(routes).toHaveLength(1);
+      expect(routes[0].distance_m).toBe(400);
+    } finally { router.free(); }
+  });
+
+  it('keeps three locally optimal alternatives on a grid', () => {
+    const nodes: GraphData['nodes'] = [];
+    const edges: GraphData['edges'] = [];
+    for (let y = 0; y < 5; y++) {
+      for (let x = 0; x < 5; x++) {
+        const n = y * 5 + x;
+        nodes.push([x * 100 / 111195.0802335329, y * 100 / 111195.0802335329]);
+        if (x < 4) edges.push([n, n + 1, 100, 3, -1]);
+        if (y < 4) edges.push([n, n + 5, 100, 3, -1]);
+      }
+    }
+    const router = new Router({ ...graph, nodes, edges, shapes: edges.map(() => []),
+      targets: { start: [0], end: [24] } });
+    try {
+      const { routes } = router.route({ ...request, alternatives: 3 });
+      expect(routes).toHaveLength(3);
+      expect(routes.map(r => r.distance_m)).toEqual([800, 800, 800]);
+    } finally { router.free(); }
+  });
+
   it('routes, returns shaped geometry and core Chinese instructions', () => {
     const router = new Router(graph);
     try {
