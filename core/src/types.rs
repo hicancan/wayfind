@@ -58,6 +58,8 @@ pub struct RouteResponse {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Route {
     pub mode: Mode,
+    /// Dominant accumulated way, or the landmark best describing an unnamed stretch.
+    pub via: String,
     pub geometry: Vec<Position>,
     /// Route distance at each geometry vertex; uses supplied edge lengths.
     pub geometry_offsets_m: Vec<f64>,

@@ -95,6 +95,13 @@ instructions include distance to the next decision; the final one says how far
 to arrival. Spoken distances round to 10 m below 100 m, otherwise 50 m, and
 never say zero metres. Exact distances remain in the numeric fields.
 
+`route.via` describes the route consistently across clients. Accumulated lengths
+include unnamed network segments. If a named way dominates, its name is used;
+otherwise the landmark covering the greatest nearby unnamed route length is
+used, weighted by proximity within 80 m and sampled every 10 m. Endpoint targets
+are excluded. Ties are deterministic; without a nearby landmark it says 沿途道路.
+Callers may name paths from sourced area outlines rather than nearby road names.
+
 Turns choose the nearest landmark within 35 m. Equal distances prefer the
 longer name, then lexical order, since the format carries no size or prominence
 metadata. `maneuver.landmark` exposes its name, coordinates and relation:

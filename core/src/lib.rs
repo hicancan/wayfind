@@ -5,6 +5,7 @@ pub mod instructions;
 mod maneuvers;
 mod navigation;
 mod routing;
+mod summary;
 mod types;
 
 pub use geo::{bearing, haversine};

@@ -361,6 +361,7 @@ impl Graph {
     ) -> Route {
         let mut route = Route {
             mode: request.mode,
+            via: String::new(),
             geometry: Vec::new(),
             geometry_offsets_m: Vec::new(),
             distance_m: 0.0,
@@ -421,6 +422,7 @@ impl Graph {
             );
         }
         route.maneuvers = maneuvers::generate(self, &route, request);
+        route.via = crate::summary::via(self, &route, request);
         route
     }
 }

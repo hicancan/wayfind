@@ -64,6 +64,7 @@ export interface RouteSegment {
 
 export interface Route {
   mode: Mode;
+  via: string;
   geometry: Position[];
   geometry_offsets_m: number[];
   distance_m: number;
