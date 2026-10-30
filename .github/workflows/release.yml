@@ -1,0 +1,35 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+      - name: Check tag matches package version
+        run: test "$GITHUB_REF_NAME" = "v$(node -p 'JSON.parse(require("fs").readFileSync("js/package.json")).version')"
+      - run: cargo install wasm-pack --locked --version 0.15.0
+      - run: cargo test --locked --workspace
+      - working-directory: js
+        run: npm ci && npm run build && npm run typecheck && npm test && npm pack --ignore-scripts
+      - env:
+          GH_TOKEN: ${{ github.token }}
+        # Consumers pin the integrity of a release. Never replace an asset.
+        run: |
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            echo "Release $GITHUB_REF_NAME already exists; its assets stay as published."
+          else
+            gh release create "$GITHUB_REF_NAME" js/wayfind-*.tgz --title "$GITHUB_REF_NAME" --generate-notes
+          fi
