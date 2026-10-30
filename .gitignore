@@ -1,0 +1,9 @@
+/target/
+/android/build/
+/js/dist/
+/js/wasm/
+node_modules/
+*.log
+.vscode/
+.idea/
+.DS_Store
