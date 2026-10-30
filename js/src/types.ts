@@ -10,6 +10,18 @@ export interface GraphData {
   names: string[];
   flags: { walk: 1; bike: 2; steps: 4; connector: 8 };
   targets: Record<string, number[]>;
+  landmarks?: Landmark[];
+}
+
+export interface Landmark { name: string; at: Position }
+export type LandmarkRelation = 'ahead' | 'passed' | 'north' | 'east' | 'south' | 'west';
+export interface ManeuverLandmark extends Landmark { relation: LandmarkRelation }
+export interface ManeuverAction {
+  kind: ManeuverType;
+  modifier: Modifier;
+  offset_m: number;
+  way_name: string | null;
+  landmark: ManeuverLandmark | null;
 }
 
 export interface RouteRequest {
@@ -33,6 +45,10 @@ export interface Maneuver {
   offset_m: number;
   distance_to_next_m: number;
   way_name: string | null;
+  target_id: string | null;
+  landmark: ManeuverLandmark | null;
+  leads_to_arrival: boolean;
+  following_actions: ManeuverAction[];
   instruction: string;
 }
 

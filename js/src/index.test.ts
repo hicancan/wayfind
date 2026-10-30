@@ -24,7 +24,7 @@ describe('real WASM typed API', () => {
       expect(route.geometry).toEqual(graph.nodes);
       expect(route.maneuvers.map(m => m.type)).toEqual(['depart', 'turn', 'arrive']);
       expect(route.maneuvers[1].modifier).toBe('left');
-      expect(route.maneuvers[1].instruction).toBe('左转进入乙路');
+      expect(route.maneuvers[1].instruction).toBe('左转进入乙路，前行 100 米到达');
       const nav = new Navigator(route);
       try {
         expect(nav.update(0, 0, 5, null, 0).voice_prompts[0].stage).toBe('depart');
@@ -37,6 +37,8 @@ describe('real WASM typed API', () => {
   it('propagates graph, request, snapping and navigation errors as exceptions', () => {
     expect(() => new Router('{}')).toThrow();
     expect(() => new Router(JSON.stringify({ ...graph, format: 'wayfind-graph/2' }))).toThrow();
+    expect(() => new Router({ ...graph, landmarks: [{ name: '', at: [0, 0] }] })).toThrow();
+    expect(() => new Router({ ...graph, landmarks: [{ name: '甲广场', at: [0, 91] }] })).toThrow();
     const router = new Router(graph);
     try {
       expect(() => router.route({ ...request, destination: { type: 'target', id: 'missing' } })).toThrow();
@@ -45,6 +47,24 @@ describe('real WASM typed API', () => {
       try { expect(() => nav.update(NaN, 0, 5, null, 0)).toThrow(); }
       finally { nav.free(); }
       expect(() => new Navigator('{}')).toThrow();
+    } finally { router.free(); }
+  });
+
+  it('round-trips landmark semantics, target names and the voice text family through WASM', () => {
+    const router = new Router({ ...graph, landmarks: [{ name: '甲广场', at: [0.001, -0.0001] }] });
+    try {
+      const route = router.route(request).routes[0];
+      expect(route.maneuvers[0].instruction).toBe('从start出发，沿甲路向东走 100 米');
+      expect(route.maneuvers[1].landmark).toEqual({ name: '甲广场', at: [0.001, -0.0001], relation: 'north' });
+      expect(route.maneuvers[1].instruction).toBe('在甲广场北侧左转进入乙路，前行 100 米到达');
+      const nav = new Navigator(route);
+      try {
+        expect(nav.update(0.00015, 0, 1, null, 0).voice_prompts[0].stage).toBe('depart');
+        const advance = nav.update(0.0003, 0, 1, null, 12_000).voice_prompts;
+        expect(advance[0].text).toBe('80 米后在甲广场北侧左转进入乙路');
+        const arrival = nav.update(0.001, 0.001, 1, null, 200_000).voice_prompts;
+        expect(arrival[0].text).toBe('已到达end附近，入口在您的前方');
+      } finally { nav.free(); }
     } finally { router.free(); }
   });
 

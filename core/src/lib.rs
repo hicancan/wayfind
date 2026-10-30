@@ -8,7 +8,7 @@ mod routing;
 mod types;
 
 pub use geo::{bearing, haversine};
-pub use graph::{Flags, Graph, GraphData};
+pub use graph::{Flags, Graph, GraphData, Landmark};
 pub use navigation::Navigator;
 pub use types::*;
 

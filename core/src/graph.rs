@@ -110,6 +110,41 @@ mod tests {
         }
         assert!(Graph::from_json("{}").is_err());
     }
+
+    #[test]
+    fn optional_landmarks_validate_names_coordinates_and_structure() {
+        let d = data(&[(0.0, 0.0), (100.0, 0.0)], &[(0, 1, 100.0, 3, -1)]);
+        assert!(d.landmarks.is_empty());
+        let base = serde_json::to_value(d).unwrap();
+        let mut omitted = base.clone();
+        omitted.as_object_mut().unwrap().remove("landmarks");
+        assert!(Graph::from_json(&omitted.to_string())
+            .unwrap()
+            .landmarks
+            .is_empty());
+        for bad in [
+            serde_json::json!(null),
+            serde_json::json!({}),
+            serde_json::json!([{"name":"  ","at":[0,0]}]),
+            serde_json::json!([{"name":"甲广场","at":[181,0]}]),
+            serde_json::json!([{"name":"甲广场","at":[0,91]}]),
+            serde_json::json!([{"name":"甲广场"}]),
+            serde_json::json!([{"name":42,"at":[0,0]}]),
+            serde_json::json!([{"name":"甲广场","at":[0]}]),
+        ] {
+            let mut value = base.clone();
+            value["landmarks"] = bad;
+            assert!(Graph::from_json(&value.to_string()).is_err());
+        }
+        for at in [[f64::NAN, 0.0], [0.0, f64::INFINITY]] {
+            let mut d: GraphData = serde_json::from_value(base.clone()).unwrap();
+            d.landmarks.push(Landmark {
+                name: "甲广场".into(),
+                at,
+            });
+            assert!(Graph::from_data(d).is_err());
+        }
+    }
 }
 
 /// The sole graph interchange format. Serde deliberately ignores extra fields.
@@ -122,6 +157,15 @@ pub struct GraphData {
     pub names: Vec<String>,
     pub flags: Flags,
     pub targets: BTreeMap<String, Vec<usize>>,
+    #[serde(default)]
+    pub landmarks: Vec<Landmark>,
+}
+
+/// A visible feature supplied by the graph's caller.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct Landmark {
+    pub name: String,
+    pub at: Position,
 }
 
 pub(crate) struct Edge {
@@ -201,6 +245,7 @@ pub struct Graph {
     pub(crate) edges: Vec<Edge>,
     pub(crate) adjacency: Vec<Vec<(usize, usize)>>,
     pub(crate) targets: BTreeMap<String, Vec<usize>>,
+    pub(crate) landmarks: Vec<Landmark>,
     index: RTree<IndexedSegment>,
     /// Declared lengths may be rounded or shorter than geodesic distances.
     pub(crate) heuristic_scale: f64,
@@ -231,6 +276,12 @@ impl Graph {
         }
         for p in &data.nodes {
             geo::validate_position(*p)?;
+        }
+        for landmark in &data.landmarks {
+            geo::validate_position(landmark.at)?;
+            if landmark.name.trim().is_empty() {
+                return Err(Error::Invalid("landmark name must not be blank".into()));
+            }
         }
         for nodes in data.targets.values() {
             if nodes.is_empty() || nodes.iter().any(|n| *n >= data.nodes.len()) {
@@ -310,6 +361,7 @@ impl Graph {
             edges,
             adjacency,
             targets: data.targets,
+            landmarks: data.landmarks,
             index: RTree::bulk_load(segments),
             heuristic_scale,
         })

@@ -25,9 +25,16 @@ points in a → b order. A name index of `-1` means unnamed.
   "shapes": [[]],
   "names": ["甲路"],
   "flags": {"walk": 1, "bike": 2, "steps": 4, "connector": 8},
-  "targets": {"start": [0], "end": [1]}
+  "targets": {"start": [0], "end": [1]},
+  "landmarks": [{"name": "甲广场", "at": [0.0005, 0.0001]}]
 }
 ```
+
+`landmarks` is optional (omitted means none). Each entry names a visible
+building, square, gate or other feature at a valid WGS84 `[longitude, latitude]`.
+Names must contain non-whitespace text; malformed entries, invalid coordinates
+and `null` are errors. Graphs, target ids, road names and landmarks come from
+callers; no place data is bundled.
 
 Flags grant walk/bike access; bike always excludes stairs. `avoid_steps` also
 excludes them for walkers. Time costs use 1.25 m/s walking, 4.2 m/s cycling,
@@ -57,7 +64,31 @@ and share at most 75% of the shorter network length with any earlier route.
 Sixteen bounded searches are attempted; this is not exhaustive enumeration.
 Route metrics use declared lengths; `geometry_offsets_m` maps vertices to those
 lengths. Maneuvers include bearings, offsets, next-maneuver distance and Chinese
-instructions. Turn bands are 15°/45°/135°, sampled over approximately 10 m.
+instructions. Turn bands are 15°/45°/135°, sampled over up to 10 m within each
+adjoining segment. Departure names its target and initial compass direction;
+arrival names its target and the entrance side, inferred from the final
+connector's bearing (or ahead when no side can be inferred). Turn/continue
+instructions include distance to the next decision; the final one says how far
+to arrival. Spoken distances round to 10 m below 100 m, otherwise 50 m, and
+never say zero metres. Exact distances remain in the numeric fields.
+
+Turns choose the nearest landmark within 35 m. Equal distances prefer the
+longer name, then lexical order, since the format carries no size or prominence
+metadata. `maneuver.landmark` exposes its name, coordinates and relation:
+`ahead`, `passed`, or `north`/`east`/`south`/`west`. Ahead/passed use the incoming
+bearing; cardinal relations describe the path's side of the landmark (e.g.
+`east` renders “在甲广场东侧”). Depart/arrive never choose a landmark.
+`target_id` identifies a depart/arrive target, otherwise null.
+
+Opposite turns on joins of at most 8 m cancel into continuing along the route
+or a slight turn. Unnamed joins of up to 25 m between nearly parallel arms
+receive the same treatment. Entrance spurs and short joins do not trigger
+minor turns below 60°; genuine junctions retain their turns and forks.
+Maneuver starts are at least 10 m apart except arrival. Close decisions that
+cannot cancel are retained in `following_actions` (kind, modifier, exact route
+offset, road name and landmark) and spoken together, including stairs. A turn
+folded into departure excludes the origin itself from its landmark choices.
+`leads_to_arrival` marks the last instruction before arrival.
 
 Navigation timestamps are monotonic, nonnegative safe-integer milliseconds;
 heading may be null. Sessions tolerate jitter, constrain subsequent matching
@@ -67,6 +98,9 @@ coalesced. Off-route means over `max(20, 2 × accuracy)` metres away for three
 consecutive fixes or eight seconds. Arrival latches within 15 m of the true
 destination. ETA uses remaining planned segment times. Rerouting is the caller's
 responsibility; sessions do not fuse sensors or infer stair elevation.
+Voice prompts use the same landmark and target semantics, e.g.
+“100 米后在甲广场东侧右转”, “前方右转”, and “已到达end附近，入口在您的左侧”. Successive voice
+prompts require at least 10 m of progress except the arrival announcement.
 
 On Windows use PowerShell 7, Rust stable with `wasm32-unknown-unknown`,
 `aarch64-linux-android` and `x86_64-linux-android`, wasm-pack, wasm-bindgen
@@ -86,6 +120,18 @@ Set `WAYFIND_GRAPH_FILE` to a local graph for the optional integration test;
 unset or absent files skip it. It checks all target pairs in the main walking
 component and times 1,000 reproducible random routes, including geometry and
 maneuvers, with an 800 ms release ceiling. External data is never committed.
+For optional guidance regression checks, also set `WAYFIND_SAMPLE_ORIGIN` to a
+target id and `WAYFIND_SAMPLE_DESTINATIONS` to a JSON array of destination ids.
+The walking routes must have at most 10 maneuvers, spaced by at least 10 m
+except arrival, and a distance in every turn instruction. Unset configuration
+or an absent graph skips this check. For human review of any three routes:
+
+```powershell
+cargo run --locked --release -p wayfind-core --example guidance -- $env:WAYFIND_GRAPH_FILE start end-a end-b end-c
+```
+
+The example prints readable instruction lists and route offsets. Add `--json`
+before the graph path for full response JSON with unrounded metrics.
 
 Android outputs are `android/build/jniLibs/{arm64-v8a,x86_64}` and
 `android/build/kotlin`, package `top.hicancan.wayfind`. Override `-NdkPath`,

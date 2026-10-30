@@ -16,6 +16,7 @@ pub struct Navigator {
     off_count: u8,
     arrived: bool,
     announced: Vec<u8>,
+    last_prompt_progress: Option<f64>,
 }
 
 impl Navigator {
@@ -33,6 +34,7 @@ impl Navigator {
             off_since: None,
             off_count: 0,
             arrived: false,
+            last_prompt_progress: None,
         })
     }
 
@@ -221,13 +223,17 @@ impl Navigator {
                 prompts.push(VoicePrompt {
                     maneuver_index: last,
                     stage: PromptStage::Arrive,
-                    text: self.route.maneuvers[last].instruction.clone(),
+                    text: instructions::chinese_arrived(&self.route.maneuvers[last]),
                 });
                 self.announced.fill(7);
             }
             return prompts;
         }
-        if off_route {
+        if off_route
+            || self
+                .last_prompt_progress
+                .is_some_and(|last| self.progress - last < 10.0)
+        {
             return prompts;
         }
         if self.announced[0] == 0 {
@@ -237,6 +243,9 @@ impl Navigator {
                     stage: PromptStage::Depart,
                     text: self.route.maneuvers[0].instruction.clone(),
                 });
+                self.announced[0] = 7;
+                self.last_prompt_progress = Some(self.progress);
+                return prompts;
             }
             self.announced[0] = 7;
         }
@@ -275,12 +284,9 @@ impl Navigator {
                 prompts.push(VoicePrompt {
                     maneuver_index: index,
                     stage,
-                    text: if stage == PromptStage::Now {
-                        maneuver.instruction.clone()
-                    } else {
-                        instructions::chinese_advance(maneuver, distance)
-                    },
+                    text: instructions::chinese_advance(maneuver, distance),
                 });
+                self.last_prompt_progress = Some(self.progress);
             }
             break;
         }
@@ -339,6 +345,32 @@ fn validate_route(route: &Route) -> Result<()> {
             || !m.bearing_after.is_finite()
         {
             return Err(invalid());
+        }
+        if let Some(landmark) = &m.landmark {
+            geo::validate_position(landmark.at)?;
+            if landmark.name.trim().is_empty() {
+                return Err(invalid());
+            }
+        }
+        let mut action_offset = m.offset_m;
+        for action in &m.following_actions {
+            if let Some(landmark) = &action.landmark {
+                geo::validate_position(landmark.at)?;
+                if landmark.name.trim().is_empty() {
+                    return Err(invalid());
+                }
+            }
+            if !metric(action.offset_m)
+                || action.offset_m < action_offset
+                || action.offset_m > m.offset_m + m.distance_to_next_m + 1e-5
+                || matches!(
+                    action.kind,
+                    crate::ManeuverType::Depart | crate::ManeuverType::Arrive
+                )
+            {
+                return Err(invalid());
+            }
+            action_offset = action.offset_m;
         }
         previous = m.offset_m;
     }

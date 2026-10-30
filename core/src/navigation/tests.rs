@@ -1,5 +1,5 @@
 use super::*;
-use crate::{testutil::*, ManeuverType};
+use crate::{testutil::*, Graph, ManeuverType};
 use std::collections::HashSet;
 
 fn update(nav: &mut Navigator, x: f64, y: f64, ms: f64) -> NavigationUpdate {
@@ -178,4 +178,98 @@ fn invalid_updates_and_serialized_routes_return_errors_without_changing_session(
     let mut bad = route;
     bad.maneuvers[0].bearing_before = f64::INFINITY;
     assert!(Navigator::new(bad).is_err());
+}
+
+#[test]
+fn prompts_share_landmark_text_and_keep_ten_metres_apart_except_arrival() {
+    let mut d = data(
+        &[(0.0, 0.0), (100.0, 0.0), (100.0, 100.0)],
+        &[(0, 1, 100.0, 3, -1), (1, 2, 100.0, 11, -1)],
+    );
+    d.landmarks.push(crate::Landmark {
+        name: "甲广场".into(),
+        at: p(100.0, -10.0),
+    });
+    let r = one(
+        &Graph::from_data(d).unwrap(),
+        &request(target("start"), target("end")),
+    );
+    let mut nav = Navigator::new(r.clone()).unwrap();
+    let mut last_progress = None;
+    let mut texts = vec![];
+    for metre in 0..=200 {
+        let (x, y) = if metre <= 100 {
+            (metre as f64, 0.0)
+        } else {
+            (100.0, (metre - 100) as f64)
+        };
+        let out = update(&mut nav, x, y, metre as f64 * 1000.0);
+        for prompt in out.voice_prompts {
+            if prompt.stage != PromptStage::Arrive {
+                if let Some(last) = last_progress {
+                    assert!(out.distance_travelled_m - last >= 10.0 - 1e-6);
+                }
+                last_progress = Some(out.distance_travelled_m);
+            }
+            texts.push(prompt.text);
+        }
+    }
+    assert!(texts.iter().any(|t| t == "90 米后在甲广场北侧左转"));
+    assert!(texts.iter().any(|t| t == "前方在甲广场北侧左转"));
+    assert!(texts.iter().any(|t| t == "已到达end附近，入口在您的左侧"));
+    // Arrival may speak even when the departure/previous prompt was <10 m ago.
+    let short = graph(&[(0.0, 0.0), (20.0, 0.0)], &[(0, 1, 20.0, 3, -1)]);
+    let mut nav = Navigator::new(one(&short, &request(target("start"), target("end")))).unwrap();
+    assert_eq!(
+        update(&mut nav, 0.0, 0.0, 0.0).voice_prompts[0].stage,
+        PromptStage::Depart
+    );
+    assert_eq!(
+        update(&mut nav, 6.0, 0.0, 1000.0).voice_prompts[0].stage,
+        PromptStage::Arrive
+    );
+}
+
+#[test]
+fn malformed_landmark_and_folded_actions_are_rejected_across_route_json() {
+    let r = one(&line(), &request(target("start"), target("end")));
+    for (field, value) in [
+        (
+            "landmark",
+            serde_json::json!({"name":"甲广场","at":[0,91],"relation":"ahead"}),
+        ),
+        (
+            "landmark",
+            serde_json::json!({"name":" ","at":[0,0],"relation":"ahead"}),
+        ),
+        (
+            "following_actions",
+            serde_json::json!([{"kind":"turn","modifier":"right","offset_m":-1}]),
+        ),
+        (
+            "following_actions",
+            serde_json::json!([{"kind":"stairs","modifier":"ahead","offset_m":999}]),
+        ),
+        (
+            "following_actions",
+            serde_json::json!([{"kind":"arrive","modifier":"ahead","offset_m":10}]),
+        ),
+    ] {
+        let mut value_route = serde_json::to_value(&r).unwrap();
+        value_route["maneuvers"][0][field] = value;
+        assert!(Navigator::from_json(&value_route.to_string()).is_err());
+    }
+    // Older serialized routes still deserialize when optional semantics are absent.
+    let mut value = serde_json::to_value(&r).unwrap();
+    for m in value["maneuvers"].as_array_mut().unwrap() {
+        for field in [
+            "target_id",
+            "landmark",
+            "leads_to_arrival",
+            "following_actions",
+        ] {
+            m.as_object_mut().unwrap().remove(field);
+        }
+    }
+    assert!(Navigator::from_json(&value.to_string()).is_ok());
 }

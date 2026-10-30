@@ -102,6 +102,37 @@ pub enum Modifier {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct ManeuverLandmark {
+    pub name: String,
+    pub at: Position,
+    pub relation: LandmarkRelation,
+}
+
+/// For a beside landmark, the cardinal side is the path's side of the landmark.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum LandmarkRelation {
+    Ahead,
+    Passed,
+    North,
+    East,
+    South,
+    West,
+}
+
+/// A decision folded into an earlier instruction to keep announcements spaced.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct ManeuverAction {
+    pub kind: ManeuverType,
+    pub modifier: Modifier,
+    pub offset_m: f64,
+    #[serde(default)]
+    pub way_name: Option<String>,
+    #[serde(default)]
+    pub landmark: Option<ManeuverLandmark>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Maneuver {
     #[serde(rename = "type")]
     pub kind: ManeuverType,
@@ -112,6 +143,15 @@ pub struct Maneuver {
     pub offset_m: f64,
     pub distance_to_next_m: f64,
     pub way_name: Option<String>,
+    #[serde(default)]
+    pub target_id: Option<String>,
+    #[serde(default)]
+    pub landmark: Option<ManeuverLandmark>,
+    /// True on the last instruction before arrival.
+    #[serde(default)]
+    pub leads_to_arrival: bool,
+    #[serde(default)]
+    pub following_actions: Vec<ManeuverAction>,
     pub instruction: String,
 }
 

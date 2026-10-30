@@ -64,7 +64,10 @@ fn time_costs_steps_modes_connectors_and_avoid_steps() {
     assert!(route
         .maneuvers
         .iter()
-        .any(|m| m.kind == ManeuverType::Stairs));
+        .any(|m| m.kind == ManeuverType::Stairs
+            || m.following_actions
+                .iter()
+                .any(|a| a.kind == ManeuverType::Stairs)));
     r.avoid_steps = true;
     close(one(&g, &r).distance_m, 220.0, 0.001);
     r.mode = Mode::Bike;

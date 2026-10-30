@@ -4,7 +4,62 @@ use std::{
     collections::BTreeMap,
     time::{Duration, Instant},
 };
-use wayfind_core::{Endpoint, Mode, Navigator, RouteRequest, Router};
+use wayfind_core::{Endpoint, ManeuverType, Mode, Navigator, RouteRequest, Router};
+
+#[test]
+fn local_graph_guidance_spacing_count_and_distances() {
+    let (Ok(path), Ok(origin), Ok(destinations)) = (
+        std::env::var("WAYFIND_GRAPH_FILE"),
+        std::env::var("WAYFIND_SAMPLE_ORIGIN"),
+        std::env::var("WAYFIND_SAMPLE_DESTINATIONS"),
+    ) else {
+        eprintln!("skipped: external guidance graph or target configuration is unset");
+        return;
+    };
+    if !std::path::Path::new(&path).is_file() {
+        eprintln!("skipped: external guidance graph is absent");
+        return;
+    }
+    let destinations: Vec<String> =
+        serde_json::from_str(&destinations).expect("destination id array");
+    assert!(!destinations.is_empty());
+    let router = Router::new(&std::fs::read_to_string(path).expect("read external graph"))
+        .expect("load external graph");
+    for id in destinations {
+        let route = router
+            .route(&RouteRequest {
+                origin: Endpoint::Target { id: origin.clone() },
+                destination: Endpoint::Target { id },
+                mode: Mode::Walk,
+                avoid_steps: false,
+                max_snap_distance_m: 100.0,
+                alternatives: 1,
+            })
+            .expect("external guidance route")
+            .routes
+            .remove(0);
+        assert!(
+            route.maneuvers.len() <= 10,
+            "external route has too many maneuvers"
+        );
+        for m in &route.maneuvers {
+            if m.kind == ManeuverType::Turn {
+                assert!(
+                    m.instruction.contains(" 米")
+                        && m.instruction.chars().any(|c| c.is_ascii_digit()),
+                    "every turn must include a distance"
+                );
+            }
+            assert!(!m.instruction.contains(" 0 米"));
+        }
+        for pair in route.maneuvers.windows(2) {
+            assert!(
+                pair[1].kind == ManeuverType::Arrive || pair[1].offset_m - pair[0].offset_m >= 10.0
+            );
+        }
+        assert!(Navigator::new(route).is_ok());
+    }
+}
 
 #[test]
 fn local_graph_connectivity_and_thousand_routes() {
