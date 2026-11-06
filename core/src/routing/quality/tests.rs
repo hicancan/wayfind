@@ -416,3 +416,26 @@ fn optional_external_graph_three_hundred_alternative_pairs() {
     }
     eprintln!("300 pairs; {returned} alternatives returned; requests with 1/2/3 routes: {counts:?}; unique rejected candidates by first failing rule: {rejected:?}; audit elapsed: {:?}", start.elapsed());
 }
+
+#[test]
+fn an_alternative_may_not_go_out_on_a_public_road_when_the_best_route_stays_inside() {
+    // Two parallel ways of similar length between the same ends; one is a public road.
+    let data = serde_json::json!({
+        "format": "wayfind-graph/1",
+        "flags": {"walk": 1, "bike": 2, "steps": 4, "connector": 8, "public": 16},
+        "nodes": [[118.9000, 32.1000], [118.9010, 32.1000], [118.9005, 32.1004], [118.9005, 32.0996]],
+        "edges": [[0, 2, 60.0, 3, -1], [2, 1, 60.0, 3, -1], [0, 3, 62.0, 19, -1], [3, 1, 62.0, 19, -1]],
+        "shapes": [
+            [[118.9000, 32.1000], [118.9005, 32.1004]], [[118.9005, 32.1004], [118.9010, 32.1000]],
+            [[118.9000, 32.1000], [118.9005, 32.0996]], [[118.9005, 32.0996], [118.9010, 32.1000]]
+        ],
+        "names": [], "entrances": {}, "targets": {"a": [0], "b": [1]}, "landmarks": [], "stats": {}
+    });
+    let graph = Graph::from_json(&data.to_string()).unwrap();
+    let request: RouteRequest = serde_json::from_value(serde_json::json!({
+        "origin": {"id": "a", "type": "target"}, "destination": {"id": "b", "type": "target"}, "mode": "walk", "alternatives": 3
+    })).unwrap();
+    let routes = graph.route(&request).unwrap().routes;
+    assert_eq!(routes.len(), 1);
+    assert!((routes[0].distance_m - 120.0).abs() < 1.0);
+}

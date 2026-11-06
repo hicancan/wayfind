@@ -4,7 +4,7 @@ use std::{
 };
 
 use crate::{
-    geo, graph::STEPS, maneuvers, Endpoint, Error, Graph, Mode, Position, Result, Route,
+    geo, graph::{PUBLIC, STEPS}, maneuvers, Endpoint, Error, Graph, Mode, Position, Result, Route,
     RouteRequest, RouteResponse, RouteSegment, Snap,
 };
 
@@ -287,6 +287,9 @@ impl Graph {
                 .any(|earlier| self.overlap(&candidate, earlier) > 0.75)
             {
                 Some(Rejection::Sharing)
+            } else if self.public_metres(&candidate) > self.public_metres(&paths[0]) + 1.0 {
+                // A route that can stay inside is never offered one that goes out on the road.
+                Some(Rejection::PublicRoad)
             } else {
                 self.alternative_quality(&candidate, &route, request, best_duration)
             };
@@ -298,6 +301,13 @@ impl Graph {
             }
         }
         Ok(RouteResponse { routes })
+    }
+
+    fn public_metres(&self, path: &[Traversal]) -> f64 {
+        path.iter()
+            .filter(|t| self.edges[t.edge].flags & PUBLIC != 0)
+            .map(|t| self.edges[t.edge].metres * (t.to - t.from).abs())
+            .sum()
     }
 
     fn overlap(&self, a: &[Traversal], b: &[Traversal]) -> f64 {

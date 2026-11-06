@@ -16,6 +16,7 @@ const EPS: f64 = 1e-6;
 pub(super) enum Rejection {
     Stretch,
     Sharing,
+    PublicRoad,
     RepeatedNode,
     Reversal,
     NearReturn,

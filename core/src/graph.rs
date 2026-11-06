@@ -9,6 +9,10 @@ pub(crate) const WALK: u32 = 1;
 pub(crate) const BIKE: u32 = 2;
 pub(crate) const STEPS: u32 = 4;
 pub(crate) const CONNECTOR: u32 = 8;
+pub(crate) const PUBLIC: u32 = 16;
+fn public_flag() -> u32 {
+    PUBLIC
+}
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Flags {
@@ -16,6 +20,9 @@ pub struct Flags {
     pub bike: u32,
     pub steps: u32,
     pub connector: u32,
+    /// Marks a road outside the area being navigated, used only when a route must leave it.
+    #[serde(default = "public_flag")]
+    pub public: u32,
 }
 
 #[cfg(test)]
@@ -265,10 +272,11 @@ impl Graph {
             data.flags.bike,
             data.flags.steps,
             data.flags.connector,
-        ) != (WALK, BIKE, STEPS, CONNECTOR)
+            data.flags.public,
+        ) != (WALK, BIKE, STEPS, CONNECTOR, PUBLIC)
         {
             return Err(Error::Invalid(
-                "flag mapping must be walk=1, bike=2, steps=4, connector=8".into(),
+                "flag mapping must be walk=1, bike=2, steps=4, connector=8, public=16".into(),
             ));
         }
         if data.shapes.len() != data.edges.len() {

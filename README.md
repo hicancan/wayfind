@@ -24,7 +24,7 @@ points in a → b order. A name index of `-1` means unnamed.
   "edges": [[0, 1, 111, 3, 0]],
   "shapes": [[]],
   "names": ["甲路"],
-  "flags": {"walk": 1, "bike": 2, "steps": 4, "connector": 8},
+  "flags": {"walk": 1, "bike": 2, "steps": 4, "connector": 8, "public": 16},
   "targets": {"start": [0], "end": [1]},
   "landmarks": [{"name": "甲广场", "at": [0.0005, 0.0001]}]
 }

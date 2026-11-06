@@ -828,7 +828,7 @@ dependencies = [
 
 [[package]]
 name = "wayfind-android"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "serde_json",
  "uniffi",
@@ -837,7 +837,7 @@ dependencies = [
 
 [[package]]
 name = "wayfind-core"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "rstar",
  "serde",
@@ -847,7 +847,7 @@ dependencies = [
 
 [[package]]
 name = "wayfind-wasm"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "serde_json",
  "wasm-bindgen",
