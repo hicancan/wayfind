@@ -1,6 +1,6 @@
 {
   "name": "wayfind",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Place-independent walking and cycling routing and live guidance, powered by Rust and WebAssembly",
   "license": "AGPL-3.0-only",
   "type": "module",

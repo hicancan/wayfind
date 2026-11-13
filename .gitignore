@@ -1,5 +1,5 @@
 /target/
-/android/build/
+/native/build/
 /js/dist/
 /js/wasm/
 node_modules/

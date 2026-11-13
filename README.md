@@ -8,7 +8,7 @@ live in `core`; WASM, Kotlin and TypeScript share the same JSON protocol.
 ```text
 core/     graph validation, spatial index, A*, alternatives, guidance, navigation
 wasm/     wasm-bindgen Router and Navigator
-android/  UniFFI 0.32 Router and Navigator, Kotlin/native build
+native/   UniFFI 0.32 Router and Navigator for Android (Kotlin) and Windows (C#)
 js/       typed ESM npm package and real WASM tests
 ```
 
@@ -143,7 +143,7 @@ cargo test --release
 npm ci --prefix js
 npm run build --prefix js
 npm test --prefix js
-pwsh android/build.ps1
+pwsh native/build.ps1
 ```
 
 Set `WAYFIND_GRAPH_FILE` to a local graph for the optional integration test;
@@ -171,8 +171,8 @@ cargo run --locked --release -p wayfind-core --example guidance -- $env:WAYFIND_
 The example prints readable instruction lists and route offsets. Add `--json`
 before the graph path for full response JSON with unrounded metrics.
 
-Android outputs are `android/build/jniLibs/{arm64-v8a,x86_64}` and
-`android/build/kotlin`, package `top.hicancan.wayfind`. Override `-NdkPath`,
+Android outputs are `native/build/jniLibs/{arm64-v8a,x86_64}`, the Windows library `native/build/windows/wayfind_native.dll`, and
+`native/build/kotlin`, package `top.hicancan.wayfind`. Override `-NdkPath`,
 `-JdkPath` or `-OutputDirectory` as needed. Add the native libraries and generated
 Kotlin to an app with JNA's Android AAR. Kotlin `Router(graphJson).route(requestJson)`
 returns response JSON; `Navigator(routeJson).update(lon, lat, accuracyM, headingDeg,

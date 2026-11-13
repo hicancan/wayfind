@@ -5,20 +5,20 @@ uniffi::setup_scaffolding!();
 #[derive(Debug, uniffi::Error)]
 #[uniffi(flat_error)]
 pub enum WayfindError {
-    Message { message: String },
+    Failed { reason: String },
 }
 
 impl std::fmt::Display for WayfindError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Message { message } => f.write_str(message),
+            Self::Failed { reason } => f.write_str(reason),
         }
     }
 }
 impl std::error::Error for WayfindError {}
 fn error(error: impl ToString) -> WayfindError {
-    WayfindError::Message {
-        message: error.to_string(),
+    WayfindError::Failed {
+        reason: error.to_string(),
     }
 }
 

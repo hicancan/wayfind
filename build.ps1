@@ -16,6 +16,6 @@ try {
     Invoke-Checked npm @('run', 'build', '--prefix', 'js')
     Invoke-Checked npm @('test', '--prefix', 'js')
     Invoke-Checked npm @('run', 'typecheck', '--prefix', 'js')
-    if (-not $SkipAndroid) { & (Join-Path $PSScriptRoot 'android/build.ps1') }
+    if (-not $SkipAndroid) { & (Join-Path $PSScriptRoot 'native/build.ps1') }
 }
 finally { Pop-Location }
