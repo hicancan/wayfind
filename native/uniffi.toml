@@ -1,3 +1,2 @@
 [bindings.kotlin]
 package_name = "top.hicancan.wayfind"
-cdylib_name = "wayfind_android"
